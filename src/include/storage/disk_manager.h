@@ -100,6 +100,15 @@ class DiskManager {
   std::recursive_mutex db_io_latch_;
   bool closed{false};
   char meta_data_[PAGE_SIZE];
+  
+  // /**
+  //  * Map logical page id to extent id
+  //  */
+  // page_id_t GetExtId(page_id_t logical_page_id);
+
+  /**
+   * 
+  */
 };
 
 #endif

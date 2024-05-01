@@ -7,20 +7,23 @@
  */
 template <size_t PageSize>
 bool BitmapPage<PageSize>::AllocatePage(uint32_t &page_offset) {
+  // LOG(INFO)<<page_allocated_<<" "<<GetMaxSupportedSize()<<"alloc";
   if(page_allocated_>=GetMaxSupportedSize()) return false; //已经分配的块超过索引上限
+  // LOG(INFO)<<"next_free_page_="<<next_free_page_;
   page_offset=next_free_page_;
   uint32_t i=page_offset/8,j=page_offset%8;
   bytes[i]|=(1<<j);
   page_allocated_++;
-  for(i=0;i<MAX_CHARS;i++){
-    for(j=0;j<8;j++){
-      if(IsPageFreeLow(i,j)){
-        next_free_page_=i*8+j;
+  for(uint32_t flag=0,x=0;x<MAX_CHARS;x++){
+    for(uint32_t y=0;y<8;y++){
+      if(IsPageFreeLow(x,y)){
+        next_free_page_=x*8+y;
+        flag=1;
         break;
       }
     }
+    if(flag) break;//直接跳出2层循环
   }
-  // LOG(INFO)<<"alloc: "<<page_offset<<" "<<i<<","<<j<<"  nextfree:"<<next_free_page_;
   return true;
 }
 
