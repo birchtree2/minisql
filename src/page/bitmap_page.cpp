@@ -7,7 +7,7 @@
  */
 template <size_t PageSize>
 bool BitmapPage<PageSize>::AllocatePage(uint32_t &page_offset) {
-  if(page_allocated_>=MAX_CHARS*8) return false; //超过索引上限
+  if(page_allocated_>=GetMaxSupportedSize()) return false; //已经分配的块超过索引上限
   page_offset=next_free_page_;
   uint32_t i=page_offset/8,j=page_offset%8;
   bytes[i]|=(1<<j);
@@ -20,6 +20,7 @@ bool BitmapPage<PageSize>::AllocatePage(uint32_t &page_offset) {
       }
     }
   }
+  // LOG(INFO)<<"alloc: "<<page_offset<<" "<<i<<","<<j<<"  nextfree:"<<next_free_page_;
   return true;
 }
 
@@ -28,14 +29,14 @@ bool BitmapPage<PageSize>::AllocatePage(uint32_t &page_offset) {
  */
 template <size_t PageSize>
 bool BitmapPage<PageSize>::DeAllocatePage(uint32_t page_offset) {
-  if(page_allocated_>=MAX_CHARS*8) return false; //超过索引上限
-  page_offset=next_free_page_;
+  if(page_offset>=GetMaxSupportedSize()) return false; //要free的块超过索引上限
   uint32_t i=page_offset/8,j=page_offset%8;
+  // LOG(INFO)<<"dealloc: "<<page_offset<<" "<<IsPageFreeLow(i,j);
   if(IsPageFreeLow(i,j)) return false;//已经free掉了
   page_allocated_--;
   next_free_page_=page_offset;
   bytes[i]&=(~(1<<j));
-  return false;
+  return true;
 }
 
 /**
@@ -43,7 +44,7 @@ bool BitmapPage<PageSize>::DeAllocatePage(uint32_t page_offset) {
  */
 template <size_t PageSize>
 bool BitmapPage<PageSize>::IsPageFree(uint32_t page_offset) const {
-  if(page_allocated_>=MAX_CHARS*8) return false;
+  if(page_allocated_>=GetMaxSupportedSize()) return false;
   return IsPageFreeLow(page_offset/8,page_offset%8);
 }
 
