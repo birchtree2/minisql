@@ -112,7 +112,8 @@ uint32_t Column::DeserializeFrom(char *buf, Column *&column) {
   offset += sizeof(uint32_t);
   memcpy(name_buf, buf + offset, nameSize);
   name_buf[nameSize] = '\0';
-  std::string name = name_buf(name_buf, nameSize);
+  // std::string name = name_buf(name_buf, nameSize);
+  std::string name = std::string(name_buf);
   delete[] name_buf;
   offset += nameSize;
 
