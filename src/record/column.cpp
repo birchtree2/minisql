@@ -83,7 +83,8 @@ uint32_t Column::GetSerializedSize() const {
   uint32_t size = 0;
   size += 4*sizeof(uint32_t) + sizeof(TypeId) + 2*sizeof(bool) + name_.size();
   // replace with your code here
-  return 0;
+  // return 0;
+  return size;//fix
 }
 
 /**

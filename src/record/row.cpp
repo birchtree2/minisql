@@ -23,7 +23,7 @@ uint32_t Row::SerializeTo(char *buf, Schema *schema) const {
   uint32_t offset = 0;
   // Field Nums
   uint32_t fieldNums = GetFieldCount();
-  memcpy(buf, &field_count, sizeof(uint32_t));  //field Nums
+  memcpy(buf, &fieldNums, sizeof(uint32_t));  //field Nums
   offset += sizeof(uint32_t);
 
   if(fieldNums == 0) return offset;
@@ -56,7 +56,7 @@ uint32_t Row::DeserializeFrom(char *buf, Schema *schema) {
   ASSERT(fields_.empty(), "Non empty field in row.");
   // replace with your code here
   uint32_t offset = 0;
-  TypeId type = 0;
+  TypeId type = TypeId::kTypeInvalid;
   
   uint32_t fieldNums = 0;
   memcpy(&fieldNums, buf, sizeof(uint32_t));
