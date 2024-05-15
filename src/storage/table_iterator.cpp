@@ -105,6 +105,6 @@ TableIterator &TableIterator::operator++() {
 TableIterator TableIterator::operator++(int) {
   TableIterator tmp(*this);
   ++(*this);
-  return tmp;
+  return TableIterator(tmp);
   // return TableIterator(nullptr, RowId(), nullptr); 
 }
