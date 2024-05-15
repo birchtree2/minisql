@@ -153,13 +153,13 @@ TableIterator TableHeap::Begin(Txn *txn) {
     }
     if(begin_page->GetFirstTupleRid(&begin_page_rid_)){
       buffer_pool_manager_->UnpinPage(begin_page_id, false);
-      return TableIterator(begin_page, begin_page_rid_, txn);
+      return TableIterator(this, begin_page_rid_, txn);
     } // 否则当前页面没有元组
     buffer_pool_manager_->UnpinPage(begin_page_id, false);
     begin_page_id = begin_page->GetNextPageId();
   }
   LOG(ERROR)<<"TableHeap::Begin: no tuple in table";
-  return TableIterator(nullptr, RowId(), nullptr); 
+  return TableIterator(this, RowId(), txn); 
 }
 
 /**
@@ -180,6 +180,6 @@ TableIterator TableHeap::End() {
     buffer_pool_manager_->UnpinPage(end_page_id, false);
     end_page_id = last_page->GetNextPageId();
   }
-  return TableIterator(last_page, RowId(INVALID_PAGE_ID, 0), nullptr);
+  return TableIterator(this, RowId(INVALID_PAGE_ID, 0), nullptr);
   // return TableIterator(nullptr, RowId(), nullptr); 
 }
