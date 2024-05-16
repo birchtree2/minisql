@@ -31,6 +31,9 @@ public:
   TableIterator operator++(int);
 
 private:
+  TableHeap *table_heap_;
+  Row *row_;
+  Txn *txn_;
   // add your own private member variables here
 };
 
