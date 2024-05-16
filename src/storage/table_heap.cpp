@@ -6,13 +6,21 @@
 bool TableHeap::InsertTuple(Row &row, Txn *txn) {
   if(row.GetSerializedSize(this->schema_) >= PAGE_SIZE) return false;
   page_id_t current_page_id = first_page_id_;
-  TablePage *current_page = reinterpret_cast<TablePage *>(buffer_pool_manager_->FetchPage(current_page_id));
+  TablePage *current_page;
+  // LOG(ERROR)<<current_page<<" "<<current_page_id;
   while(true){
+    current_page = reinterpret_cast<TablePage *>(buffer_pool_manager_->FetchPage(current_page_id));
     if(!current_page) return false;
+    if(current_page->GetTupleCount()==0&&current_page->GetNextPageId()==0){
+       //说明这是一个从buffer pool直接出来，没经过初始化的page
+      current_page->Init(current_page_id, INVALID_PAGE_ID, log_manager_, txn);//FIX
+    }
     if(current_page->InsertTuple(row, schema_, txn, lock_manager_, log_manager_)){
+      // LOG(ERROR)<<"ok3";
       buffer_pool_manager_->UnpinPage(current_page_id, true);
       return true;
     }
+    // LOG(ERROR)<<"next page";
     page_id_t next_page_id = current_page->GetNextPageId();
     if(next_page_id == INVALID_PAGE_ID){
       // 新建一页
@@ -23,6 +31,7 @@ bool TableHeap::InsertTuple(Row &row, Txn *txn) {
       new_page->SetNextPageId(INVALID_PAGE_ID); 
       current_page->SetNextPageId(new_page_id);
       buffer_pool_manager_->UnpinPage(current_page_id, true); 
+      // LOG(ERROR)<<new_page->GetFreeSpaceRemaining();
       current_page_id = new_page_id; 
       continue;
     }
