@@ -108,6 +108,12 @@ std::pair<GenericKey *, RowId> LeafPage::GetItem(int index) { return {KeyAt(inde
  * @return page size after insertion
  */
 int LeafPage::Insert(GenericKey *key, const RowId &value, const KeyManager &KM) {
+  if(GetSize()==0){//结点为空
+    SetKeyAt(0,key);
+    SetValueAt(0,value);
+    IncreaseSize(1);
+    return 1;
+  }
   int index = KeyIndex(key, KM);
   PairCopy(PairPtrAt(index+1),PairPtrAt(index),GetSize()-index);// 将index及之后的元素后移
   SetKeyAt(index, key);
