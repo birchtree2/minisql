@@ -1,3 +1,35 @@
+Vscode + gdb调试   先手动make, 然后找到对应的test.cpp文件,然后点击调试
+    TODO: 添加pre launch task实现自动make
+
+```json
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Debug tests",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceRoot}/build/test/${fileBasenameNoExtension}",
+            "args": ["para1", "para2"],
+            "stopAtEntry": false,
+            "cwd": "${fileDirname}",
+            "environment": [],
+            "externalConsole": false,
+            "MIMode": "gdb",
+            "setupCommands": [
+                {
+                    "description": "Enable pretty-printing for gdb",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                }
+            ],
+            "preLaunchTask": "",
+            "miDebuggerPath": "/usr/bin/gdb"
+        }
+    ]
+}
+```
+
 # MiniSQL
 
 
