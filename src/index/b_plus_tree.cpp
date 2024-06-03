@@ -7,7 +7,7 @@
 #include "index/generic_key.h"
 #include "page/index_roots_page.h"
 
-/**
+/**d
  * TODO: Student Implement
  */
 BPlusTree::BPlusTree(index_id_t index_id, BufferPoolManager *buffer_pool_manager, const KeyManager &KM,
@@ -253,7 +253,34 @@ void BPlusTree::Remove(const GenericKey *key, Txn *transaction) {
  */
 template <typename N>
 bool BPlusTree::CoalesceOrRedistribute(N *&node, Txn *transaction) {
-  return false;
+  if (node->IsRootPage()) return AdjustRoot(node);//根节点  
+  Page* parent_page=buffer_pool_manager_->FetchPage(node->GetParentPageId());
+  InternalPage* parent=reinterpret_cast<InternalPage*>(parent_page->GetData());
+  //获取兄弟节点
+  int index=parent->ValueIndex(node->GetPageId());
+  int sib_index=index==0?index+1:index-1;
+  //如果node是第一个节点，就取右边的兄弟。否则取左边的
+  Page* sib_page=buffer_pool_manager_->FetchPage(parent->ValueAt(sib_index));
+  N* sib=reinterpret_cast<N*>(sib_page->GetData());//node可能是叶子，也可能不是叶子，所以用N*
+  //index 是node在parent数组的位置  而id代表不同节点的编号
+  bool del_node=false;
+  if(node->GetSize()+sib->GetSize()>node->GetMaxSize()){
+    //If sibling's size + input page's size > page's max size, then redistribute.
+    Redistribute(sib,node,index);
+    del_node=false;//不删除
+  }else{
+    if(index==0){//把sibling移到node,node不删除
+      Coalesce(node,sib,parent,1,transaction);
+      del_node=false;
+    }else{//把node移到sibling,并删除node
+      Coalesce(sib,node,parent,index,transaction);
+      del_node=true;
+    }
+  }
+  //sibling和parent都被修改了,所以is_dirty=true
+  buffer_pool_manager_->UnpinPage(sib->GetPageId(),true);
+  buffer_pool_manager_->UnpinPage(parent->GetPageId(),true);
+  return del_node;
 }
 
 /*
@@ -269,12 +296,18 @@ bool BPlusTree::CoalesceOrRedistribute(N *&node, Txn *transaction) {
  */
 bool BPlusTree::Coalesce(LeafPage *&neighbor_node, LeafPage *&node, InternalPage *&parent, int index,
                          Txn *transaction) {
-  return false;
+  node->MoveAllTo(neighbor_node);
+  parent->Remove(index);
+  if(parent->GetSize()>=parent->GetMinSize())return false;
+  return CoalesceOrRedistribute<InternalPage>(parent,transaction);
 }
 
 bool BPlusTree::Coalesce(InternalPage *&neighbor_node, InternalPage *&node, InternalPage *&parent, int index,
                          Txn *transaction) {
-  return false;
+  node->MoveAllTo(neighbor_node,parent->KeyAt(index),buffer_pool_manager_);
+  parent->Remove(index);
+  if(parent->GetSize()>=parent->GetMinSize())return false;
+  return CoalesceOrRedistribute<InternalPage>(parent,transaction);
 }
 
 /*
@@ -287,8 +320,37 @@ bool BPlusTree::Coalesce(InternalPage *&neighbor_node, InternalPage *&node, Inte
  * @param   node               input from method coalesceOrRedistribute()
  */
 void BPlusTree::Redistribute(LeafPage *neighbor_node, LeafPage *node, int index) {
+  page_id_t parent_id=node->GetParentPageId();
+  //根据id取出对应的page
+  Page* ptr=buffer_pool_manager_->FetchPage(parent_id);
+  InternalPage* parent=reinterpret_cast<InternalPage*>(ptr->GetData());
+  if(index!=0){
+    neighbor_node->MoveLastToFrontOf(node);
+  }else{
+    neighbor_node->MoveFirstToEndOf(node);
+  }
+  //把middle key放到parent的中间
+  page_id_t mid_id=parent->ValueIndex(neighbor_node->GetPageId());
+  parent->SetKeyAt(mid_id,node->KeyAt(0));
 }
 void BPlusTree::Redistribute(InternalPage *neighbor_node, InternalPage *node, int index) {
+  page_id_t parent_id=node->GetParentPageId();
+  //根据id取出对应的page
+  Page* ptr=buffer_pool_manager_->FetchPage(parent_id);
+  InternalPage* parent=reinterpret_cast<InternalPage*>(ptr->GetData());
+  int id=0;
+  GenericKey * newKey=0;
+  if(index==0){
+    id=parent->ValueIndex(neighbor_node->GetPageId());
+    newKey=neighbor_node->KeyAt(1);
+    neighbor_node->MoveFirstToEndOf(node,parent->KeyAt(id),buffer_pool_manager_);
+  }else{
+    id=parent->ValueIndex(node->GetPageId());
+    newKey=neighbor_node->KeyAt(neighbor_node->GetSize()-1);
+    neighbor_node->MoveLastToFrontOf(node,parent->KeyAt(id),buffer_pool_manager_);
+  }
+  parent->SetKeyAt(id,newKey);
+  buffer_pool_manager_->UnpinPage(parent_id,true);
 }
 /*
  * Update root page if necessary
@@ -301,6 +363,28 @@ void BPlusTree::Redistribute(InternalPage *neighbor_node, InternalPage *node, in
  * happened
  */
 bool BPlusTree::AdjustRoot(BPlusTreePage *old_root_node) {
+  page_id_t old_root_id=old_root_node->GetPageId();
+  if(!old_root_node->IsLeafPage() && old_root_node->GetSize()==1){
+    //case 1
+    InternalPage* old_root=reinterpret_cast<InternalPage*>(old_root_node);
+    root_page_id_=old_root->RemoveAndReturnOnlyChild();//返回唯一的child作为新根
+    UpdateRootPageId(false);//更新Index_roots_page
+    //获取新根
+    Page* new_root_page=buffer_pool_manager_->FetchPage(root_page_id_);
+    BPlusTreePage*new_root=reinterpret_cast<BPlusTreePage*>(new_root_page->GetData());
+    new_root->SetParentPageId(INVALID_PAGE_ID);
+    buffer_pool_manager_->UnpinPage(root_page_id_,true);//因为新根改了parent
+    buffer_pool_manager_->UnpinPage(old_root_id,false);
+    buffer_pool_manager_->DeletePage(old_root_id);
+    return true;
+  }else if(old_root_node->GetSize()==0){
+    //case 2
+    root_page_id_=INVALID_PAGE_ID;
+    UpdateRootPageId(false);
+    buffer_pool_manager_->UnpinPage(old_root_id,false);
+    buffer_pool_manager_->DeletePage(old_root_id);
+    return true;
+  }
   return false;
 }
 
@@ -313,7 +397,12 @@ bool BPlusTree::AdjustRoot(BPlusTreePage *old_root_node) {
  * @return : index iterator
  */
 IndexIterator BPlusTree::Begin() {
-  return IndexIterator();
+  Page *page = FindLeafPage(nullptr, INVALID_PAGE_ID, true);
+  //flag=true,找最左边的节点,不需要key和pageid
+  if (page == nullptr) return IndexIterator();
+  int page_id=page->GetPageId();
+  buffer_pool_manager_->UnpinPage(page_id, false);
+  return IndexIterator(page_id, buffer_pool_manager_,0);//最左边,index=0
 }
 
 /*
@@ -322,7 +411,14 @@ IndexIterator BPlusTree::Begin() {
  * @return : index iterator
  */
 IndexIterator BPlusTree::Begin(const GenericKey *key) {
-   return IndexIterator();
+   Page *page = FindLeafPage(key,INVALID_PAGE_ID, false);
+  //flag=false, 根据key去找对应的叶子
+  LeafPage* leaf=reinterpret_cast<LeafPage*>(page);
+  if (page == nullptr) return IndexIterator();
+  int page_id=page->GetPageId();
+  buffer_pool_manager_->UnpinPage(page_id, false);
+  //根据key, 在叶子里找到对应的index
+  return IndexIterator(page_id, buffer_pool_manager_,leaf->KeyIndex(key, processor_));
 }
 
 /*
@@ -331,7 +427,7 @@ IndexIterator BPlusTree::Begin(const GenericKey *key) {
  * @return : index iterator
  */
 IndexIterator BPlusTree::End() {
-  return IndexIterator();
+  return IndexIterator();//???看起来这里没有用
 }
 
 /*****************************************************************************
@@ -343,6 +439,19 @@ IndexIterator BPlusTree::End() {
  * Note: the leaf page is pinned, you need to unpin it after use.
  */
 Page *BPlusTree::FindLeafPage(const GenericKey *key, page_id_t page_id, bool leftMost) {
+  //这里的page_id似乎没有用?
+  if(IsEmpty()) return nullptr;
+  page_id=root_page_id_;
+  while(1){
+    Page* page=buffer_pool_manager_->FetchPage(page_id);
+    BPlusTreePage* node=reinterpret_cast<BPlusTreePage*>(page->GetData());
+    if(node->IsLeafPage()) return page;//到叶子了
+    InternalPage* internal=reinterpret_cast<InternalPage*>(node);
+    //如果是一直往左，就选0位置的page_id. 否则就根据key去查找
+    if(leftMost) page_id=internal->ValueAt(0);
+    else page_id=internal->Lookup(key,processor_);
+    buffer_pool_manager_->UnpinPage(internal->GetPageId(),false);
+  }
   return nullptr;
 }
 
@@ -355,6 +464,18 @@ Page *BPlusTree::FindLeafPage(const GenericKey *key, page_id_t page_id, bool lef
  * updating it.
  */
 void BPlusTree::UpdateRootPageId(int insert_record) {
+//insert_record看起来是int,实际是bool
+//index_roots_page 记录了数据库里所有的索引(B+树)的root_page_id。 
+//它本身也是一个page,id为INDEX_ROOTS_PAGE_ID
+//如果当前B+树的根变了，就要修改index_roots_page
+  Page* page=buffer_pool_manager_->FetchPage(INDEX_ROOTS_PAGE_ID);
+  IndexRootsPage* index_roots_page=reinterpret_cast<IndexRootsPage*>(page->GetData());
+  if(insert_record){//找到当前B+树的id,插入
+    index_roots_page->Insert(index_id_,root_page_id_);
+  }else{
+    index_roots_page->Update(index_id_,root_page_id_);
+  }
+  buffer_pool_manager_->UnpinPage(INDEX_ROOTS_PAGE_ID,true);
 }
 
 /**
