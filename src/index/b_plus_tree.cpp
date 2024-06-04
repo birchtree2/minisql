@@ -124,6 +124,8 @@ bool BPlusTree::InsertIntoLeaf(GenericKey *key, const RowId &value, Txn *transac
     new_leaf_page->Insert(key, value, processor_);
     // Update parent page
     InsertIntoParent(leaf_page, key, new_leaf_page, transaction);
+    //记得unpin new leaf page
+    buffer_pool_manager_->UnpinPage(new_leaf_page->GetPageId(),true);
   }
   buffer_pool_manager_->UnpinPage(leaf_page->GetPageId(), true);
   return true;
