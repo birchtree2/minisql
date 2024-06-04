@@ -44,6 +44,8 @@ TEST(BPlusTreeTests, SampleTest) {
   // Insert data
   for (int i = 0; i < n; i++) {
     tree.Insert(keys[i], values[i]);
+    if(i==20)  tree.PrintTree(mgr[0], table_schema);
+    LOG(INFO)<<i;
   }
   ASSERT_TRUE(tree.Check());
   // Print tree

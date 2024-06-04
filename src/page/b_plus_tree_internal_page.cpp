@@ -103,7 +103,7 @@ page_id_t InternalPage::Lookup(const GenericKey *key, const KeyManager &KM) {
  */
 void InternalPage::PopulateNewRoot(const page_id_t &old_value, GenericKey *new_key, const page_id_t &new_value) {
   SetSize(2);//size=value个数=key个数+1
-  SetKeyAt(0,nullptr);
+  // SetKeyAt(0,nullptr); //memcpy空指针会出错
   SetKeyAt(1,new_key);
   SetValueAt(0, old_value);
   SetValueAt(1,new_value);

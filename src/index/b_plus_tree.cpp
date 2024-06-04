@@ -147,7 +147,8 @@ BPlusTreeInternalPage *BPlusTree::Split(InternalPage *node, Txn *transaction) {
   // Split data.
   node->MoveHalfTo(new_internal_page, buffer_pool_manager_);
   // Unpin.
-  buffer_pool_manager_->UnpinPage(node->GetPageId(), true);
+  // buffer_pool_manager_->UnpinPage(node->GetPageId(), true);
+  //不需要unpin, 因为这个node在InsertIntoParent的时候还要用到
   return new_internal_page;
 }
 
@@ -162,7 +163,8 @@ BPlusTreeLeafPage *BPlusTree::Split(LeafPage *node, Txn *transaction) {
   // Split data.
   node->MoveHalfTo(new_leaf_page);
   // Unpin.
-  buffer_pool_manager_->UnpinPage(node->GetPageId(), true);
+  // buffer_pool_manager_->UnpinPage(node->GetPageId(), true);
+  //不需要unpin, 因为这个node在InsertIntoParent的时候还要用到
   return new_leaf_page;
 }
 
