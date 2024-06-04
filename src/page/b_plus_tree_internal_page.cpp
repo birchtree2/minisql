@@ -147,7 +147,7 @@ void InternalPage::CopyNFrom(void *src, int size, BufferPoolManager *buffer_pool
   PairCopy(PairPtrAt(pos),src,size);
   IncreaseSize(size);
   //对于复制过来的子节点，要把他门的父节点更新成当前Page
-  for(int i=0;i<size;++i){
+  for(int i=0;i<size;i++){
     page_id_t page_id=ValueAt(pos+i);//id
     Page *page=buffer_pool_manager->FetchPage(page_id);//fetch->修改->unPin
     if(page==nullptr){

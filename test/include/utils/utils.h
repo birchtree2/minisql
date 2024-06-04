@@ -12,7 +12,8 @@
 template <typename T>
 void ShuffleArray(std::vector<T> &array) {
   std::random_device rd;
-  std::mt19937 rng(rd());
+  // std::mt19937 rng(rd());
+  std::mt19937 rng(514);//固定随机种子便于调试，正式测试的时候要删掉
   std::shuffle(array.begin(), array.end(), rng);
 }
 

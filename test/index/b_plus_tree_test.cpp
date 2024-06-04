@@ -19,7 +19,8 @@ TEST(BPlusTreeTests, SampleTest) {
   BPlusTree tree(0, engine.bpm_, KP);
   TreeFileManagers mgr("tree_");
   // Prepare data
-  const int n = 2000;
+  // const int n = 2000;
+  const int n=200;
   vector<GenericKey *> keys;
   vector<RowId> values;
   vector<GenericKey *> delete_seq;
@@ -44,27 +45,42 @@ TEST(BPlusTreeTests, SampleTest) {
   // Insert data
   for (int i = 0; i < n; i++) {
     tree.Insert(keys[i], values[i]);
-    if(i==20)  tree.PrintTree(mgr[0], table_schema);
+    // if(i==168)  tree.PrintTree(mgr[0], table_schema);
+    // if(i==169)  tree.PrintTree(mgr[1], table_schema);
     LOG(INFO)<<i;
   }
   ASSERT_TRUE(tree.Check());
   // Print tree
-  tree.PrintTree(mgr[0], table_schema);
+  tree.PrintTree(mgr[1], table_schema);
   // Search keys
   vector<RowId> ans;
   for (int i = 0; i < n; i++) {
+    // LOG(INFO)<<"expected"<<kv_map[keys_copy[i]].GetPageId()<<" "<<kv_map[keys_copy[i]].GetSlotNum();
     tree.GetValue(keys_copy[i], ans);
+    
     ASSERT_EQ(kv_map[keys_copy[i]], ans[i]);
+    // LOG(INFO)<<"ok "<<i;
   }
   ASSERT_TRUE(tree.Check());
+  LOG(INFO)<<"search and delete ok";
   // Delete half keys
+  auto printKey=[&](GenericKey *fkey)->void{//用来debug的函数
+    Row ans;
+    KP.DeserializeToKey(fkey, ans, table_schema);
+    LOG(INFO) <<"remove: " <<ans.GetField(0)->toString();
+  };
   for (int i = 0; i < n / 2; i++) {
+    printKey(delete_seq[i]);
     tree.Remove(delete_seq[i]);
   }
-  tree.PrintTree(mgr[1], table_schema);
+  LOG(INFO)<<"remove ok";
+  tree.PrintTree(mgr[2], table_schema);
+
   // Check valid
   ans.clear();
   for (int i = 0; i < n / 2; i++) {
+    // LOG(INFO)<<i;
+    printKey(delete_seq[i]);
     ASSERT_FALSE(tree.GetValue(delete_seq[i], ans));
   }
   for (int i = n / 2; i < n; i++) {

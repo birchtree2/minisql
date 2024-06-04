@@ -56,7 +56,7 @@ bool BPlusTree::GetValue(const GenericKey *key, std::vector<RowId> &result, Txn 
   // Find the corresponding answer
   if (is_found) {
     result.push_back(rowid);
-    LOG(ERROR)<<rowid.GetPageId()<<" "<<rowid.GetSlotNum();
+    // LOG(ERROR)<<rowid.GetPageId()<<" "<<rowid.GetSlotNum();
   }else{
     LOG(ERROR)<<"not found";
   }
