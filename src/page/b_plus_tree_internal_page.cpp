@@ -121,7 +121,7 @@ int InternalPage::InsertNodeAfter(const page_id_t &old_value, GenericKey *new_ke
   SetKeyAt(index+1, new_key);
   SetValueAt(index+1, new_value);
   IncreaseSize(1);
-  return 0;
+  return GetSize();
 }
 
 /*****************************************************************************
