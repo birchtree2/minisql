@@ -49,14 +49,18 @@ bool BPlusTree::IsEmpty() const {
  */
 bool BPlusTree::GetValue(const GenericKey *key, std::vector<RowId> &result, Txn *transaction) {
   if (IsEmpty()) return false; // Empty tree
-  result.clear();
+  // result.clear(); result不用清空,每查一次就把结果放到最后面
   LeafPage *leaf_page = reinterpret_cast<LeafPage *>(FindLeafPage(key)->GetData());
   RowId rowid;
   bool is_found = leaf_page->Lookup(key, rowid, processor_);
   // Find the corresponding answer
   if (is_found) {
     result.push_back(rowid);
+    LOG(ERROR)<<rowid.GetPageId()<<" "<<rowid.GetSlotNum();
+  }else{
+    LOG(ERROR)<<"not found";
   }
+  
   buffer_pool_manager_->UnpinPage(leaf_page->GetPageId(), false);
   return is_found;
 }
@@ -119,11 +123,14 @@ bool BPlusTree::InsertIntoLeaf(GenericKey *key, const RowId &value, Txn *transac
   // Check if split is necessary
   if (leaf_page->GetSize() > leaf_max_size_) {
     // Split the leaf page
+    LOG(ERROR)<<"Split";
     LeafPage *new_leaf_page = Split(leaf_page, transaction);
-    // Insert the new key & value pair into the new leaf page
-    new_leaf_page->Insert(key, value, processor_);
-    // Update parent page
-    InsertIntoParent(leaf_page, key, new_leaf_page, transaction);
+    leaf_page->SetNextPageId(new_leaf_page->GetPageId());//把当前叶子和新叶子连起来
+    /*把分裂后新叶子最左侧的插入到父亲   调用keyAt(0)
+    如[1,2,3,4]->  [3]
+               [1,2] [3,4]                                              
+    */
+    InsertIntoParent(leaf_page, new_leaf_page->KeyAt(0), new_leaf_page, transaction);
     //记得unpin new leaf page
     buffer_pool_manager_->UnpinPage(new_leaf_page->GetPageId(),true);
   }
