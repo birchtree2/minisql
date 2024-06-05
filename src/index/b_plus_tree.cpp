@@ -518,8 +518,8 @@ IndexIterator BPlusTree::Begin() {
 IndexIterator BPlusTree::Begin(const GenericKey *key) {
    Page *page = FindLeafPage(key,INVALID_PAGE_ID, false);
   //flag=false, 根据key去找对应的叶子
-  LeafPage* leaf=reinterpret_cast<LeafPage*>(page);
   if (page == nullptr) return IndexIterator();
+  LeafPage* leaf=reinterpret_cast<LeafPage*>(page->GetData());
   int page_id=page->GetPageId();
   buffer_pool_manager_->UnpinPage(page_id, false);
   //根据key, 在叶子里找到对应的index

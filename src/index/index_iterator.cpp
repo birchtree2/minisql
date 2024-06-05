@@ -25,12 +25,12 @@ IndexIterator &IndexIterator::operator++() {
   } else { // 溢出到下一页
     int next_page_id = page->GetNextPageId();
     if (next_page_id != INVALID_PAGE_ID) { // 是否已经到达最后一页
-      buffer_pool_manager->UnpinPage(current_page_id, false);
+      buffer_pool_manager->UnpinPage(page->GetPageId(), false);
       page = reinterpret_cast<LeafPage *>(buffer_pool_manager->FetchPage(next_page_id)->GetData());
-      item_index = 0;
-    } else { // 已经到达最后一页
-      item_index = page->GetSize(); // 置为无效值
+    } else {
+      page = nullptr; // 置为 nullptr
     }
+    item_index = 0;
     current_page_id = next_page_id;
   }
   return *this;
