@@ -16,11 +16,24 @@ IndexIterator::~IndexIterator() {
 }
 
 std::pair<GenericKey *, RowId> IndexIterator::operator*() {
-  ASSERT(false, "Not implemented yet.");
+  return std::make_pair(page->KeyAt(item_index), page->ValueAt(item_index));
 }
 
 IndexIterator &IndexIterator::operator++() {
-  ASSERT(false, "Not implemented yet.");
+  if (item_index + 1 < page->GetSize()) {
+    item_index++;
+  } else { // 溢出到下一页
+    int next_page_id = page->GetNextPageId();
+    if (next_page_id != INVALID_PAGE_ID) { // 是否已经到达最后一页
+      buffer_pool_manager->UnpinPage(current_page_id, false);
+      page = reinterpret_cast<LeafPage *>(buffer_pool_manager->FetchPage(next_page_id)->GetData());
+      item_index = 0;
+    } else { // 已经到达最后一页
+      item_index = page->GetSize(); // 置为无效值
+    }
+    current_page_id = next_page_id;
+  }
+  return *this;
 }
 
 bool IndexIterator::operator==(const IndexIterator &itr) const {
