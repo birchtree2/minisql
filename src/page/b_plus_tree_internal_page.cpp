@@ -1,3 +1,4 @@
+
 #include "page/b_plus_tree_internal_page.h"
 
 #include "index/generic_key.h"
@@ -73,6 +74,7 @@ void InternalPage::PairCopy(void *dest, void *src, int pair_num) {
 page_id_t InternalPage::Lookup(const GenericKey *key, const KeyManager &KM) {
   int l=1,r=GetSize()-1,mid,ans=GetSize();//l=1是因为第一个key是无效的
   if(GetSize()==0) return INVALID_PAGE_ID;
+  if(GetSize()==1) return ValueAt(0);
   if(KM.CompareKeys(key,KeyAt(1))<0) return ValueAt(0);
   //如果key比第一个key还小，那么返回第一个value指针
   /*按照顺序存储 m个键和m+1个指针（这些指针记录的是⼦结点的 page_id ）。由于键和指针的数量不相等，因此我们需
@@ -109,7 +111,7 @@ void InternalPage::PopulateNewRoot(const page_id_t &old_value, GenericKey *new_k
   SetValueAt(1,new_value);
 }
 
-/*
+/* CP
  * Insert new_key & new_value pair right after the pair with its value ==
  * old_value
  * @return:  new size after insertion
@@ -269,4 +271,17 @@ void InternalPage::CopyFirstFrom(const page_id_t value, BufferPoolManager *buffe
   InternalPage *internal_page=reinterpret_cast<InternalPage *>(page->GetData());
   internal_page->SetParentPageId(GetPageId());
   buffer_pool_manager->UnpinPage(value,true);
+}
+page_id_t InternalPage::LeftMostKeyFromCurr(BufferPoolManager *buffer_pool_manager) {
+  Page *currPage = buffer_pool_manager->FetchPage(this->GetPageId());
+  auto *curr = reinterpret_cast<BPlusTreePage *>(currPage->GetData());
+  InternalPage *internalPage;
+  while (!curr->IsLeafPage()) {//由于curr是由this转换过来的，所以至少可以进入一次
+    buffer_pool_manager->UnpinPage(curr->GetPageId(), false);           // 每找一层关闭上一层的内节点page
+    internalPage = reinterpret_cast<::InternalPage *>(currPage);  // 打开上一层内节点page
+    currPage = buffer_pool_manager->FetchPage(internalPage->ValueAt(0));  // 改变当前页的指针
+    curr = reinterpret_cast<BPlusTreePage *>(currPage->GetData());
+  }
+  buffer_pool_manager->UnpinPage(curr->GetPageId(),false);
+  return internalPage->ValueAt(0);
 }
