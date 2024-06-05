@@ -58,7 +58,7 @@ bool BPlusTree::GetValue(const GenericKey *key, std::vector<RowId> &result, Txn 
     result.push_back(rowid);
     // LOG(ERROR)<<rowid.GetPageId()<<" "<<rowid.GetSlotNum();
   }else{
-    LOG(ERROR)<<"not found";
+    // LOG(ERROR)<<"not found";
   }
   
   buffer_pool_manager_->UnpinPage(leaf_page->GetPageId(), false);
@@ -123,7 +123,7 @@ bool BPlusTree::InsertIntoLeaf(GenericKey *key, const RowId &value, Txn *transac
   // Check if split is necessary
   if (leaf_page->GetSize() > leaf_max_size_) {
     // Split the leaf page
-    LOG(ERROR)<<"Split";
+    // LOG(ERROR)<<"Split";
     LeafPage *new_leaf_page = Split(leaf_page, transaction);
     leaf_page->SetNextPageId(new_leaf_page->GetPageId());//把当前叶子和新叶子连起来
     /*把分裂后新叶子最左侧的插入到父亲   调用keyAt(0)
@@ -227,23 +227,30 @@ void BPlusTree::InsertIntoParent(BPlusTreePage *old_node, GenericKey *key, BPlus
  */
 void BPlusTree::Remove(const GenericKey *key, Txn *transaction) {
   if (IsEmpty()) return ; // Empty tree
-  // Find the right leaf page
-  LeafPage *leaf_page = reinterpret_cast<LeafPage *>(FindLeafPage(key, root_page_id_, true)->GetData());
+  // Find the right leaf page   (isLeftMost=false, 因为要根据key去查)
+  LeafPage *leaf_page = reinterpret_cast<LeafPage *>(FindLeafPage(key, root_page_id_, false)->GetData());
   // Delete the key & value pair
+  int del_index=leaf_page->KeyIndex(key, processor_);
   int new_size = leaf_page->RemoveAndDeleteRecord(key, processor_);
   // Check if merge is necessary
   if (new_size < leaf_page->GetMinSize()) {
     // Merge the leaf page
-    if (CoalesceOrRedistribute<LeafPage>(leaf_page, transaction))
+    if (CoalesceOrRedistribute<LeafPage>(leaf_page, transaction)){
+      buffer_pool_manager_->UnpinPage(leaf_page->GetPageId(), true);//先unpin
       buffer_pool_manager_->DeletePage(leaf_page->GetPageId());
-  } else if (!leaf_page->KeyIndex(key, processor_)) { // The deleted key is the first key, need pop up to delete.
+    }
+  } else if (!del_index) { // The deleted key is the first key, need pop up to delete.
     GenericKey *new_key = leaf_page->KeyAt(0); // New key to replace the old one.
-    InternalPage *parent_page = reinterpret_cast<InternalPage *>(buffer_pool_manager_->FetchPage(leaf_page->GetParentPageId()));
+    InternalPage *parent_page = reinterpret_cast<InternalPage *>(
+      buffer_pool_manager_->FetchPage(leaf_page->GetParentPageId())->GetData()//GetData()
+      );
     page_id_t pageid = leaf_page->GetPageId();
     // Pop up to delete
     while (!parent_page->IsRootPage() && parent_page->ValueIndex(pageid) == 0) {
       buffer_pool_manager_->UnpinPage(parent_page->GetPageId(), false);
-      parent_page = reinterpret_cast<InternalPage *>(buffer_pool_manager_->FetchPage(parent_page->GetParentPageId()));
+      parent_page = reinterpret_cast<InternalPage *>(
+        buffer_pool_manager_->FetchPage(parent_page->GetParentPageId())->GetData()
+      );
       pageid = parent_page->GetPageId();
     }
     int tmp_index = parent_page->ValueIndex(pageid);
@@ -335,14 +342,19 @@ void BPlusTree::Redistribute(LeafPage *neighbor_node, LeafPage *node, int index)
   //根据id取出对应的page
   Page* ptr=buffer_pool_manager_->FetchPage(parent_id);
   InternalPage* parent=reinterpret_cast<InternalPage*>(ptr->GetData());
+   //更新后，修改parent的key,注意两种情况是不一样的
   if(index!=0){
     neighbor_node->MoveLastToFrontOf(node);
+    page_id_t mid_index=parent->ValueIndex(node->GetPageId());
+    parent->SetKeyAt(mid_index,node->KeyAt(0));//自己在右边，把自己的第一个节点给父母
   }else{
     neighbor_node->MoveFirstToEndOf(node);
+    page_id_t mid_index=parent->ValueIndex(neighbor_node->GetPageId());
+    parent->SetKeyAt(mid_index,neighbor_node->KeyAt(0));//把右边兄弟的第一个节点给父母
+    
   }
-  //把middle key放到parent的中间
-  page_id_t mid_id=parent->ValueIndex(neighbor_node->GetPageId());
-  parent->SetKeyAt(mid_id,node->KeyAt(0));
+ 
+  
 }
 void BPlusTree::Redistribute(InternalPage *neighbor_node, InternalPage *node, int index) {
   page_id_t parent_id=node->GetParentPageId();
