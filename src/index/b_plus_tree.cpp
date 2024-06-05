@@ -438,7 +438,7 @@ IndexIterator BPlusTree::Begin(const GenericKey *key) {
  * @return : index iterator
  */
 IndexIterator BPlusTree::End() {
-  return IndexIterator();//???看起来这里没有用
+  return IndexIterator();
 }
 
 /*****************************************************************************
