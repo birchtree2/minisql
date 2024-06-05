@@ -131,7 +131,7 @@ int LeafPage::Insert(GenericKey *key, const RowId &value, const KeyManager &KM) 
 void LeafPage::MoveHalfTo(LeafPage *recipient) {
   int size=GetSize();//把后size/2个元素移动到recipient
   recipient->CopyNFrom(PairPtrAt(size-size/2),size/2);
-  IncreaseSize(-size/2);
+  IncreaseSize(-(size/2));
 }
 
 /*
@@ -153,7 +153,7 @@ void LeafPage::CopyNFrom(void *src, int size) {
  */
 bool LeafPage::Lookup(const GenericKey *key, RowId &value, const KeyManager &KM) {
   int index=KeyIndex(key,KM);
-  if(index==GetSize()) return false;
+  if(index>=GetSize()) return false;
   if(KM.CompareKeys(KeyAt(index),key)==0){
     value=ValueAt(index);
     return true;
