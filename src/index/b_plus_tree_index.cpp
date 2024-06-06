@@ -91,6 +91,7 @@ IndexIterator BPlusTreeIndex::GetBeginIterator(GenericKey *key) {
   return container_.Begin(key);
 }
 
-IndexIterator BPlusTreeIndex::GetEndIterator() {
-  return container_.End();
+IndexIterator BPlusTreeIndex::GetEndIterator() { return container_.End(); }
+BPlusTree& BPlusTreeIndex::Debug() {
+  return container_;
 }

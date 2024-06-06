@@ -22,7 +22,7 @@ class BPlusTreeIndex : public Index {
   IndexIterator GetBeginIterator(GenericKey *key);
 
   IndexIterator GetEndIterator();
-
+  BPlusTree& Debug();//for debug
  protected:
   // comparator for key
   KeyManager processor_;

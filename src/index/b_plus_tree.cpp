@@ -20,6 +20,7 @@ BPlusTree::BPlusTree(index_id_t index_id, BufferPoolManager *buffer_pool_manager
   Page* pages = buffer_pool_manager_->FetchPage(INDEX_ROOTS_PAGE_ID);
   IndexRootsPage* index_roots_page = reinterpret_cast<IndexRootsPage*>(pages);
   index_roots_page->GetRootId(index_id, &root_page_id_);
+  // LOG(ERROR)<<"index_id="<<index_id<<"new b+ tree root="<<root_page_id_;
   buffer_pool_manager_->UnpinPage(INDEX_ROOTS_PAGE_ID, true);
   if (leaf_max_size == UNDEFINED_SIZE)
     leaf_max_size_ = (PAGE_SIZE - LEAF_PAGE_HEADER_SIZE) / (processor_.GetKeySize() + sizeof(RowId));
@@ -95,6 +96,7 @@ void BPlusTree::StartNewTree(GenericKey *key, const RowId &value) {
   Page* new_page = buffer_pool_manager_->NewPage(new_page_id);
   if (new_page == nullptr) throw ("out of memory"); // Out of memory exception.
   root_page_id_ = new_page_id;
+  UpdateRootPageId(true);//记得更新meta page里面记录的root_page_id, 因为是新根,insert=true
   LeafPage *root_page = reinterpret_cast<LeafPage *>(new_page->GetData());
   root_page->Init(root_page_id_, INVALID_PAGE_ID, processor_.GetKeySize(), leaf_max_size_);
   root_page->Insert(key, value, processor_);
@@ -200,6 +202,7 @@ void BPlusTree::InsertIntoParent(BPlusTreePage *old_node, GenericKey *key, BPlus
     old_node->SetParentPageId(new_page_id);
     new_node->SetParentPageId(new_page_id);
     root_page_id_ = new_page_id;
+    UpdateRootPageId(false);//更新meta page
     buffer_pool_manager_->UnpinPage(new_page_id, true);
   } else {
     // Find the parent page
@@ -529,8 +532,10 @@ void BPlusTree::UpdateRootPageId(int insert_record) {
   Page* page=buffer_pool_manager_->FetchPage(INDEX_ROOTS_PAGE_ID);
   IndexRootsPage* index_roots_page=reinterpret_cast<IndexRootsPage*>(page->GetData());
   if(insert_record){//找到当前B+树的id,插入
+    // LOG(INFO)<<"insert root"<<index_id_<<" "<<root_page_id_;
     index_roots_page->Insert(index_id_,root_page_id_);
   }else{
+    // LOG(INFO)<<"update root"<<index_id_<<" "<<root_page_id_;
     index_roots_page->Update(index_id_,root_page_id_);
   }
   buffer_pool_manager_->UnpinPage(INDEX_ROOTS_PAGE_ID,true);
