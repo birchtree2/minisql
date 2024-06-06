@@ -111,10 +111,11 @@ dberr_t CatalogManager::CreateTable(const string &table_name, TableSchema *schem
   table_names_[table_name] = table_id;
   catalog_meta_->table_meta_pages_[table_id] = page_id;
 
-  auto table_meta = TableMetadata::Create(table_id, table_name, page_id, schema);
+  Schema *tmp_schema = Schema::DeepCopySchema(schema);
+  auto table_meta = TableMetadata::Create(table_id, table_name, page_id, tmp_schema);
   table_meta->SerializeTo(page->GetData());
   buffer_pool_manager_->UnpinPage(page_id, true);
-  auto table_heap = TableHeap::Create(buffer_pool_manager_, schema, txn, log_manager_, lock_manager_);
+  auto table_heap = TableHeap::Create(buffer_pool_manager_, tmp_schema, txn, log_manager_, lock_manager_);
   table_info = TableInfo::Create();
   table_info->Init(table_meta, table_heap);
   tables_[table_id] = table_info;
