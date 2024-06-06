@@ -5,7 +5,9 @@
 #include "common/instance.h"
 #include "gtest/gtest.h"
 #include "index/generic_key.h"
-
+#include "glog/logging.h"
+#include "utils/utils.h"
+#include <utils/tree_file_mgr.h>
 static const std::string db_name = "bp_tree_index_test.db";
 
 TEST(BPlusTreeTests, BPlusTreeIndexGenericKeyTest) {
@@ -48,7 +50,7 @@ TEST(BPlusTreeTests, BPlusTreeIndexSimpleTest) {
   const TableSchema table_schema(columns);
   auto *index_schema = Schema::ShallowCopySchema(&table_schema, index_key_map);
   auto *index = new BPlusTreeIndex(0, index_schema, 256, bpm_);
-  for (int i = 0; i < 10; i++) {
+  for (int i = 0; i < 10000; i++) {
     std::vector<Field> fields{Field(TypeId::kTypeInt, i),
                               Field(TypeId::kTypeChar, const_cast<char *>("minisql"), 7, true)};
     Row row(fields);
@@ -57,7 +59,7 @@ TEST(BPlusTreeTests, BPlusTreeIndexSimpleTest) {
   }
   // Test Scan
   std::vector<RowId> ret;
-  for (int i = 0; i < 10; i++) {
+  for (int i = 0; i < 10000; i++) {
     std::vector<Field> fields{Field(TypeId::kTypeInt, i),
                               Field(TypeId::kTypeChar, const_cast<char *>("minisql"), 7, true)};
     Row row(fields);
@@ -65,6 +67,8 @@ TEST(BPlusTreeTests, BPlusTreeIndexSimpleTest) {
     ASSERT_EQ(DB_SUCCESS, index->ScanKey(row, ret, nullptr));
     ASSERT_EQ(rid.Get(), ret[i].Get());
   }
+  TreeFileManagers mgr("tree_");
+  index->Debug().PrintTree(mgr[10],index_schema);
   // Iterator Scan
   IndexIterator iter = index->GetBeginIterator();
   uint32_t i = 0;

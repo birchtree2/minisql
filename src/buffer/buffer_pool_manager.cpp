@@ -40,6 +40,8 @@ Page *BufferPoolManager::FetchPage(page_id_t page_id) {
     frame_id=it->second;
     replacer_->Pin(frame_id);//pin it
     pages_[frame_id].pin_count_++;
+    // if(pages_[frame_id].page_id_==0) throw "Error";
+    pages_[frame_id].page_id_=page_id;
     return &pages_[frame_id];
   }else{//1.2
     if(free_list_.size()){//find from free list first
@@ -63,6 +65,7 @@ Page *BufferPoolManager::FetchPage(page_id_t page_id) {
   disk_manager_->ReadPage(r->page_id_,r->data_);
   replacer_->Pin(frame_id);//同1,Pin
   r->pin_count_++;
+  // if(frame_id==1&&r->page_id_==0){throw "ERROR!";}
   return r;
 }
 
@@ -70,6 +73,7 @@ Page *BufferPoolManager::FetchPage(page_id_t page_id) {
  * TODO: Student Implement
  */
 Page *BufferPoolManager::NewPage(page_id_t &page_id) {
+  // if(pages_[1].page_id_==0){throw "ERROR!";}
   // 0.   Make sure you call AllocatePage!
   // 1.   If all the pages in the buffer pool are pinned, return nullptr.
   // 2.   Pick a victim page P from either the free list or the replacer. Always pick from the free list first.

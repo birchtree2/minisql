@@ -16,7 +16,7 @@ TEST(BPlusTreeTests, IndexIteratorTest) {
   BPlusTree tree(0, engine.bpm_, KP);
   // Generate insert record
   vector<GenericKey *> insert_key;
-  for (int i = 1; i <= 50; i++) {
+  for (int i = 1; i <= 50000; i++) {
     GenericKey *key = KP.InitKey();
     std::vector<Field> fields{Field(TypeId::kTypeInt, i)};
     KP.SerializeFromKey(key, Row(fields), table_schema);
@@ -25,7 +25,7 @@ TEST(BPlusTreeTests, IndexIteratorTest) {
   }
   // Generate delete record
   vector<GenericKey *> delete_key;
-  for (int i = 2; i <= 50; i += 2) {
+  for (int i = 2; i <= 50000; i += 2) {
     GenericKey *key = KP.InitKey();
     std::vector<Field> fields{Field(TypeId::kTypeInt, i)};
     KP.SerializeFromKey(key, Row(fields), table_schema);
@@ -38,7 +38,7 @@ TEST(BPlusTreeTests, IndexIteratorTest) {
   for (auto key : delete_key) {
     ASSERT_FALSE(tree.GetValue(key, v));
   }
-  for (int i = 1; i <= 49; i += 2) {
+  for (int i = 1; i <= 49999; i += 2) {
     GenericKey *key = KP.InitKey();
     std::vector<Field> fields{Field(TypeId::kTypeInt, i)};
     KP.SerializeFromKey(key, Row(fields), table_schema);
