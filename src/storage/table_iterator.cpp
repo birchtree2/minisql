@@ -94,6 +94,7 @@ TableIterator &TableIterator::operator++() {
     row_->SetRowId(INVALID_ROWID);
     return *this; // 到达表尾部
   }
+  row_->destroy();//???
   row_->SetRowId(next_rid);
   if (*this != table_heap_->End()) {
     table_heap_->GetTuple(row_, txn_);
