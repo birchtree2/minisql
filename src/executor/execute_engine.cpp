@@ -339,6 +339,50 @@ dberr_t ExecuteEngine::ExecuteCreateTable(pSyntaxNode ast, ExecuteContext *conte
 #ifdef ENABLE_EXECUTE_DEBUG
   LOG(INFO) << "ExecuteCreateTable" << std::endl;
 #endif
+  if(ast->child_==nullptr) return DB_FAILED;
+  if(dbs_.find(current_db_)==dbs_.end()){
+    cout<<"No database selected";
+    return DB_FAILED;
+  }
+  std::string table_name=ast->child_->val_;//第一个儿子就是表名
+  pSyntaxNode columns=ast->child_->next_->child_;
+  //找到column definition 
+  pSyntaxNode node=columns;
+  vector<string>primary_keys;
+  while(node!= nullptr){
+    //向右走，找到primary key
+    if(node->type_==kNodeColumnList&&string(node->val_)=="primary keys"){
+      pSyntaxNode primary_node=node->child_;
+      while(primary_node!= nullptr){
+        primary_keys.push_back(string(primary_node->val_));
+        primary_node=primary_node->next_;
+      }
+    }
+    node=node->next_;
+  }
+  int col_id=0;
+  while(node!=nullptr){
+    col_id++;
+    if(node->type_==kNodeColumnDefinition){
+      bool unique=false;
+      pSyntaxNode identifier=node->child_;//kNodeIdentifier
+      string name=identifier->val_;
+      string type=identifier->next_->val_;
+      Column *column;
+      if(type=="int")column=new Column(name,kTypeInt,col_id,true,unique);
+      if(type=="float")column=new Column(name,kTypeFloat,col_id,true,unique);
+      if(type=="char"){
+        pSyntaxNode lennode=identifier->next_->child_;//char(16) 后面的16
+        if(lennode==nullptr) return DB_FAILED;
+        string len=lennode->val_;
+        for(char c:len){//检查长度字符串是否合法
+          if(!isdigit(c))return DB_FAILED;
+        }
+        if(stoi(len)<0)return DB_FAILED;//char(-10)
+        column=new Column(name,kTypeChar,stoi(len),col_id,true,unique);
+      }
+    }
+  }
   return DB_FAILED;
 }
 
@@ -349,7 +393,17 @@ dberr_t ExecuteEngine::ExecuteDropTable(pSyntaxNode ast, ExecuteContext *context
 #ifdef ENABLE_EXECUTE_DEBUG
   LOG(INFO) << "ExecuteDropTable" << std::endl;
 #endif
- return DB_FAILED;
+ if(current_db_.empty())return DB_FAILED;
+  auto catalog=context->GetCatalog();
+  string table_name(ast->child_->val_);
+  dberr_t res=catalog->DropTable(table_name);//先drop table
+  if(res!=DB_SUCCESS)return res;
+  vector<IndexInfo*>indexes;
+  catalog->GetTableIndexes(table_name,indexes);
+  for(auto it:indexes){//再drop index
+      catalog->DropIndex(table_name,it->GetIndexName());
+  }
+  return DB_SUCCESS;
 }
 
 /**
@@ -417,8 +471,9 @@ dberr_t ExecuteEngine::ExecuteExecfile(pSyntaxNode ast, ExecuteContext *context)
  * TODO: Student Implement
  */
 dberr_t ExecuteEngine::ExecuteQuit(pSyntaxNode ast, ExecuteContext *context) {
-#ifdef ENABLE_EXECUTE_DEBUG
+#ifdef ENABLE_EXECUTE _DEBUG
   LOG(INFO) << "ExecuteQuit" << std::endl;
 #endif
- return DB_FAILED;
+ current_db_="";
+ return DB_SUCCESS;
 }

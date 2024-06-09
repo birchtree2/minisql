@@ -3,11 +3,13 @@
 //
 #include "executor/executors/seq_scan_executor.h"
 
+
 SeqScanExecutor::SeqScanExecutor(ExecuteContext *exec_ctx, const SeqScanPlanNode *plan)
     : AbstractExecutor(exec_ctx),
       plan_(plan),
       iterator_(nullptr, RowId(INVALID_PAGE_ID, 0), nullptr),
-      is_schema_same_(false) {}
+      is_schema_same_(false) {
+      }
 
 bool SeqScanExecutor::SchemaEqual(const Schema *table_schema, const Schema *output_schema) {
   auto table_columns = table_schema->GetColumns();

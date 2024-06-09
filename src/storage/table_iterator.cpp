@@ -8,11 +8,12 @@
  */
 TableIterator::TableIterator(TableHeap *table_heap, RowId rid, Txn *txn)
   : table_heap_(table_heap), row_(nullptr), txn_(txn) {
-  this->row_ = new Row(rid);
-  if(!table_heap->GetTuple(row_, txn)){
-    delete row_;
-    row_ = nullptr;
-  }
+  
+  //因为有时要先初始化一个空的iterator,table_heap=nullptr,所以跳过这里的检查
+  if (rid.GetPageId() != INVALID_PAGE_ID){  // 有效则读取数据
+    this->row_=new Row(rid);
+    this->table_heap_->GetTuple(this->row_, nullptr);
+  }else this->row_=new Row(INVALID_ROWID);
 }
 
 TableIterator::TableIterator(const TableIterator &other) {
@@ -38,7 +39,7 @@ bool TableIterator::operator!=(const TableIterator &itr) const {
 }
 
 const Row &TableIterator::operator*() {
-  ASSERT(false, "Not implemented yet.");
+  // ASSERT(false, "Not implemented yet.");
   return *row_;
 }
 
