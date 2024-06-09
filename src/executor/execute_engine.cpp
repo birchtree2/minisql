@@ -342,13 +342,14 @@ dberr_t ExecuteEngine::ExecuteCreateTable(pSyntaxNode ast, ExecuteContext *conte
   if(ast->child_==nullptr) return DB_FAILED;
   if(dbs_.find(current_db_)==dbs_.end()){
     cout<<"No database selected";
-    return DB_FAILED;
+    return DB_NOT_EXIST;
   }
   std::string table_name=ast->child_->val_;//第一个儿子就是表名
-  pSyntaxNode columns=ast->child_->next_->child_;
+  pSyntaxNode columns_node=ast->child_->next_->child_;
   //找到column definition 
-  pSyntaxNode node=columns;
-  vector<string>primary_keys;
+  pSyntaxNode node=columns_node;
+  vector<string>primary_keys,unique_keys;
+  vector<Column*> columns;
   while(node!= nullptr){
     //向右走，找到primary key
     if(node->type_==kNodeColumnList&&string(node->val_)=="primary keys"){
@@ -361,17 +362,21 @@ dberr_t ExecuteEngine::ExecuteCreateTable(pSyntaxNode ast, ExecuteContext *conte
     node=node->next_;
   }
   int col_id=0;
+  node=columns_node;//记得回到起点！
   while(node!=nullptr){
-    col_id++;
     if(node->type_==kNodeColumnDefinition){
-      bool unique=false;
       pSyntaxNode identifier=node->child_;//kNodeIdentifier
       string name=identifier->val_;
       string type=identifier->next_->val_;
       Column *column;
+      bool unique=false;
+      if(node->val_!=nullptr&&string(node->val_)=="unique"){
+        unique=true;
+        unique_keys.push_back(name);
+      }
       if(type=="int")column=new Column(name,kTypeInt,col_id,true,unique);
-      if(type=="float")column=new Column(name,kTypeFloat,col_id,true,unique);
-      if(type=="char"){
+      else if(type=="float")column=new Column(name,kTypeFloat,col_id,true,unique);
+      else if(type=="char"){
         pSyntaxNode lennode=identifier->next_->child_;//char(16) 后面的16
         if(lennode==nullptr) return DB_FAILED;
         string len=lennode->val_;
@@ -381,9 +386,33 @@ dberr_t ExecuteEngine::ExecuteCreateTable(pSyntaxNode ast, ExecuteContext *conte
         if(stoi(len)<0)return DB_FAILED;//char(-10)
         column=new Column(name,kTypeChar,stoi(len),col_id,true,unique);
       }
+      col_id++;
+      columns.push_back(column);
+      
+    }
+    node=node->next_;
+  }
+  Schema* schema=new Schema(columns);//创建schema
+  TableInfo* tableinfo;
+  CatalogManager* catalog=context->GetCatalog();
+  dberr_t err=catalog->CreateTable(table_name,schema,context->GetTransaction(),tableinfo);
+  if(err!=DB_SUCCESS) return err;
+  //创建index
+  if(unique_keys.size()){
+    for(auto s : unique_keys){
+      IndexInfo *index_info;
+      catalog->CreateIndex(table_name, "UNIQUE_"+s + "_"+"ON_" + table_name, 
+        unique_keys, context->GetTransaction(), index_info, "btree");
     }
   }
-  return DB_FAILED;
+  if(primary_keys.size()){
+    IndexInfo *index_info;
+    string s="";
+    for(auto t : primary_keys) s+=t+"_";
+    catalog->CreateIndex(table_name, "PK_"+s + "_"+"ON_" + table_name, 
+        unique_keys, context->GetTransaction(), index_info, "btree");
+  }
+  return DB_SUCCESS;
 }
 
 /**
@@ -401,6 +430,7 @@ dberr_t ExecuteEngine::ExecuteDropTable(pSyntaxNode ast, ExecuteContext *context
   vector<IndexInfo*>indexes;
   catalog->GetTableIndexes(table_name,indexes);
   for(auto it:indexes){//再drop index
+      // cout<<it->GetIndexName();
       catalog->DropIndex(table_name,it->GetIndexName());
   }
   return DB_SUCCESS;
@@ -413,7 +443,33 @@ dberr_t ExecuteEngine::ExecuteShowIndexes(pSyntaxNode ast, ExecuteContext *conte
 #ifdef ENABLE_EXECUTE_DEBUG
   LOG(INFO) << "ExecuteShowIndexes" << std::endl;
 #endif
-  return DB_FAILED;
+  if(current_db_.empty())return DB_NOT_EXIST;
+  CatalogManager* catalog=context->GetCatalog();
+  vector<TableInfo*>tables;
+  catalog->GetTables(tables);
+  vector<IndexInfo*>indexes;
+  for(auto it:tables){
+    catalog->GetTableIndexes(it->GetTableName(),indexes);
+  }
+  std::stringstream ss;
+  ResultWriter writer(ss);
+  vector<int>width;
+  width.push_back(10);
+  for(auto it:indexes)
+    width[0]=max(width[0],(int)it->GetIndexName().length());
+  writer.Divider(width);
+  writer.BeginRow();
+  writer.WriteHeaderCell("Index",width[0]);
+  writer.EndRow();
+  writer.Divider(width);
+  for(auto it:indexes){
+    writer.BeginRow();
+    writer.WriteCell(it->GetIndexName(),width[0]);
+    writer.EndRow();
+  }
+  writer.Divider(width);
+  std::cout<<writer.stream_.rdbuf();
+  return DB_SUCCESS;
 }
 
 /**
@@ -423,7 +479,20 @@ dberr_t ExecuteEngine::ExecuteCreateIndex(pSyntaxNode ast, ExecuteContext *conte
 #ifdef ENABLE_EXECUTE_DEBUG
   LOG(INFO) << "ExecuteCreateIndex" << std::endl;
 #endif
-  return DB_FAILED;
+  if(current_db_.empty()) return DB_NOT_EXIST;//
+  CatalogManager* catalog=context->GetCatalog();
+  pSyntaxNode node=ast->child_;
+  string index_name=node->val_;
+  node=node->next_;
+  string table_name=node->val_;
+  node=node->next_->child_;//到columnlist
+  vector<string>index_keys;
+  while(node!= nullptr){
+    index_keys.push_back(string(node->val_));
+    node=node->next_;
+  }
+  IndexInfo *index_info;
+  return catalog->CreateIndex(table_name,index_name,index_keys,context->GetTransaction(),index_info,"btree");
 }
 
 /**
@@ -433,7 +502,15 @@ dberr_t ExecuteEngine::ExecuteDropIndex(pSyntaxNode ast, ExecuteContext *context
 #ifdef ENABLE_EXECUTE_DEBUG
   LOG(INFO) << "ExecuteDropIndex" << std::endl;
 #endif
-  return DB_FAILED;
+  if(current_db_.empty()) return DB_NOT_EXIST;
+  auto catalog=context->GetCatalog();
+  string index_name=ast->child_->val_;
+  vector<TableInfo*>tables;
+  auto res=DB_INDEX_NOT_FOUND;
+  catalog->GetTables(tables);
+  for(auto it:tables)
+    if(catalog->DropIndex(it->GetTableName(),index_name)==DB_SUCCESS)res=DB_SUCCESS;
+  return res;
 }
 
 dberr_t ExecuteEngine::ExecuteTrxBegin(pSyntaxNode ast, ExecuteContext *context) {
@@ -475,5 +552,6 @@ dberr_t ExecuteEngine::ExecuteQuit(pSyntaxNode ast, ExecuteContext *context) {
   LOG(INFO) << "ExecuteQuit" << std::endl;
 #endif
  current_db_="";
- return DB_SUCCESS;
+ //sexit(0);
+ return DB_QUIT;
 }

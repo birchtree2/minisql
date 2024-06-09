@@ -24,7 +24,7 @@ TEST_F(ExecutorTest, SimpleSeqScanTest) {
   std::vector<Row> result_set{};
   GetExecutionEngine()->ExecutePlan(plan, &result_set, GetTxn(), GetExecutorContext());
 
-  // Verify
+  //Verify
   ASSERT_EQ(result_set.size(), 500);
   for (const auto &row : result_set) {
     ASSERT_TRUE(row.GetField(0)->CompareLessThan(Field(kTypeInt, 500)));

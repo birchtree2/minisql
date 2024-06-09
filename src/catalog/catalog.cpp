@@ -224,11 +224,14 @@ dberr_t CatalogManager::DropTable(const string &table_name) {
   auto table_id = table_names_[table_name];
   table_names_.erase(table_name);
   tables_.erase(table_id);
+  // TableInfo *tmp=tables_[table_id];
   if(catalog_meta_->table_meta_pages_.find(table_id) != catalog_meta_->table_meta_pages_.end()){
+    // buffer_pool_manager_->DeletePage(catalog_meta_->table_meta_pages_.at(table_id));
     catalog_meta_->table_meta_pages_.erase(table_id);
     FlushCatalogMetaPage();
   }
-  buffer_pool_manager_->DeletePage(catalog_meta_->table_meta_pages_.at(table_id));
+  // buffer_pool_manager_->DeletePage(catalog_meta_->table_meta_pages_.at(table_id));
+  //???上面这里是什么意思
   return DB_SUCCESS;
   // return DB_FAILED;
 }
@@ -243,10 +246,11 @@ dberr_t CatalogManager::DropIndex(const string &table_name, const string &index_
   index_names_.at(table_name).erase(index_name);
   indexes_.erase(index_id);
   if(catalog_meta_->index_meta_pages_.find(index_id) != catalog_meta_->index_meta_pages_.end()){
+    // buffer_pool_manager_->DeletePage(catalog_meta_->index_meta_pages_.at(index_id));
     catalog_meta_->index_meta_pages_.erase(index_id);
     FlushCatalogMetaPage();
   }
-  buffer_pool_manager_->DeletePage(catalog_meta_->index_meta_pages_.at(index_id));
+  // buffer_pool_manager_->DeletePage(catalog_meta_->index_meta_pages_.at(index_id));
   return DB_SUCCESS;
   // return DB_FAILED;
 }
