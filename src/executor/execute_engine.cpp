@@ -537,10 +537,71 @@ dberr_t ExecuteEngine::ExecuteTrxRollback(pSyntaxNode ast, ExecuteContext *conte
 /**
  * TODO: Student Implement
  */
+
+extern "C" {
+int yyparse(void);//为了调用
+#include "parser/minisql_lex.h"
+#include "parser/parser.h"
+}
+
+
 dberr_t ExecuteEngine::ExecuteExecfile(pSyntaxNode ast, ExecuteContext *context) {
 #ifdef ENABLE_EXECUTE_DEBUG
   LOG(INFO) << "ExecuteExecfile" << std::endl;
 #endif
+  string filename=ast->child_->val_;
+  ifstream fin;
+  fin.open(filename);
+  if(!fin.is_open()){
+    cout<<"file not found";
+    return DB_FAILED;
+  }
+  char cmd[1024];
+  while(!fin.eof()){
+    memset(cmd,0,sizeof(cmd));
+    int ptr=0;
+    char ch;
+    while(!fin.eof()){
+      ch=fin.get();
+      if(ch!=EOF)cmd[ptr++]=ch;
+      if(ch==';') break;
+    }
+    printf("%s\n",cmd);
+    YY_BUFFER_STATE bp = yy_scan_string(cmd);
+      if (bp == nullptr) {
+        LOG(ERROR) << "Failed to create yy buffer state." << std::endl;
+        exit(1);
+      }
+      yy_switch_to_buffer(bp);
+
+      // init parser module
+      MinisqlParserInit();
+
+      // parse
+      yyparse();
+
+      // parse result handle
+      if (MinisqlParserGetError()) {
+        // error
+        printf("%s\n", MinisqlParserGetErrorMessage());
+      } else {
+        // Comment them out if you don't need to debug the syntax tree
+        printf("[INFO] Sql syntax parse ok!\n");
+        // SyntaxTreePrinter printer(MinisqlGetParserRootNode());
+        // printer.PrintTree(syntax_tree_file_mgr[syntax_tree_id++]);
+      }
+
+      auto result = Execute(MinisqlGetParserRootNode());
+
+      // clean memory after parse
+      MinisqlParserFinish();
+      yy_delete_buffer(bp);
+      yylex_destroy();
+
+      // quit condition
+      ExecuteInformation(result);
+      if(result==DB_QUIT) return DB_QUIT;
+  }
   return DB_FAILED;
 }
 
