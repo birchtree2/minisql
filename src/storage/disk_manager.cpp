@@ -62,24 +62,34 @@ page_id_t DiskManager::AllocatePage() {
   for(ext_id=0;ext_id<pMetaPage->GetExtentNums();ext_id++){
     if(pMetaPage->GetExtentUsedPage(ext_id)<BITMAP_SIZE) break;
   }
-  //每个分区有(BITMAP_SIZE+1)个物理页，再加上开头的metadata页
-  page_id_t bmap_phy_id=ext_id*(BITMAP_SIZE+1)+1;//第ext_id哥分区的位图页物理id
+  BitmapPage<PAGE_SIZE>* bmap=0;
+  uint32_t bmap_phy_id=1+ext_id*(BITMAP_SIZE+1);
   char buf[PAGE_SIZE]={'\0'};
-  ReadPhysicalPage(bmap_phy_id,buf);//读取位图页信息
-  BitmapPage<PAGE_SIZE>* bmap=reinterpret_cast< BitmapPage<PAGE_SIZE>* >(buf);
+  if(ext_id==pMetaPage->num_extents_){
+    if(pMetaPage->num_extents_<(PAGE_SIZE-8)/4){
+      pMetaPage->num_extents_++;
+      pMetaPage->extent_used_page_[ext_id]=0;
+      //创建位图
+      bmap=new BitmapPage<PAGE_SIZE>();
+    }else
+      return false;//满了
+  }else{//获取位图
+    //每个分区有(BITMAP_SIZE+1)个物理页，再加上开头的metadata页
+    //第ext_id哥分区的位图页物理id
+    ReadPhysicalPage(bmap_phy_id,buf);
+    bmap=reinterpret_cast<BitmapPage<PAGE_SIZE>*>(buf);
+  }
   uint32_t page_offset=0;
   if(bmap->AllocatePage(page_offset)){
-    WritePhysicalPage(bmap_phy_id,buf);
+    WritePhysicalPage(bmap_phy_id,reinterpret_cast<char*>(bmap));
     pMetaPage->num_allocated_pages_++;//更新总的数据页数量
     pMetaPage->extent_used_page_[ext_id]++;//更新每个分区的数据页数量
-    if(ext_id==pMetaPage->GetExtentNums()){
-      pMetaPage->num_extents_++;//更新分区数量
-    }
+    WritePhysicalPage(META_PAGE_ID,GetMetaData());//更新meta page页 (原来忘记了)
     //返回新分配的数据页的逻辑页id  每个分区BITMAP_SIZE个数据页
     page_id_t logical_id=ext_id*(BITMAP_SIZE)+page_offset;
     return logical_id;
   }else{
-    LOG(ERROR)<<"bitmap allocate failed";
+    LOG(ERROR)<<"bmap allocate failed";
     return INVALID_PAGE_ID;
   }
 
@@ -103,7 +113,7 @@ void DiskManager::DeAllocatePage(page_id_t logical_page_id) {
     pMetaPage->num_allocated_pages_--;
     pMetaPage->extent_used_page_[ext_id]--;
   }else{
-    LOG(ERROR)<<"bitmap allocate failed";
+    LOG(ERROR)<<"bmap allocate failed";
   }
 }
 
@@ -127,7 +137,7 @@ bool DiskManager::IsPageFree(page_id_t logical_page_id) {
  */
 page_id_t DiskManager::MapPageId(page_id_t logical_page_id) {
   int ext_id=logical_page_id/BITMAP_SIZE;
-  //物理页=1meta + 前面ext_id个分区(每个BITMAP_SIZE+1) + 1 bitmap + 当前数据页编号
+  //物理页=1meta + 前面ext_id个分区(每个BITMAP_SIZE+1) + 1 bmap + 当前数据页编号
   return 1+ext_id*(BITMAP_SIZE+1)+1+logical_page_id%BITMAP_SIZE;
 }
 
