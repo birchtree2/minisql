@@ -26,6 +26,9 @@ bool TableHeap::InsertTuple(Row &row, Txn *txn) {
       // 新建一页
       page_id_t new_page_id;
       auto new_page = reinterpret_cast<TablePage *>(buffer_pool_manager_->NewPage(new_page_id));
+      if(new_page_id==current_page_id){
+        LOG(ERROR)<<"new page allocate error!";
+      }
       if (!new_page) return false;
       new_page->Init(new_page_id, current_page_id, log_manager_, txn);
       new_page->SetNextPageId(INVALID_PAGE_ID); 
