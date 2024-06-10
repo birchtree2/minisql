@@ -184,7 +184,7 @@ dberr_t CatalogManager::CreateIndex(const std::string &table_name, const string 
   auto catalog_meta_page = buffer_pool_manager_->FetchPage(CATALOG_META_PAGE_ID);
   catalog_meta_->SerializeTo(catalog_meta_page->GetData());
   buffer_pool_manager_->UnpinPage(CATALOG_META_PAGE_ID, true);
-
+  buffer_pool_manager_->UnpinPage(index_page_id,true);//记得把index page保存
   return DB_SUCCESS;
   // return DB_FAILED;
 }
