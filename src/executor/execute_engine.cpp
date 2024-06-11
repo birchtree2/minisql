@@ -549,14 +549,16 @@ dberr_t ExecuteEngine::ExecuteExecfile(pSyntaxNode ast, ExecuteContext *context)
 #ifdef ENABLE_EXECUTE_DEBUG
   LOG(INFO) << "ExecuteExecfile" << std::endl;
 #endif
+  auto start_time = std::chrono::system_clock::now();
   string filename=ast->child_->val_;
   ifstream fin;
   fin.open(filename);
   if(!fin.is_open()){
-    cout<<"file not found";
+    printf("file %s not exist",filename.c_str());
     return DB_FAILED;
   }
   char cmd[1024];
+  int total_inst=0,succ_inst=0;
   while(!fin.eof()){
     memset(cmd,0,sizeof(cmd));
     int ptr=0;
@@ -567,6 +569,7 @@ dberr_t ExecuteEngine::ExecuteExecfile(pSyntaxNode ast, ExecuteContext *context)
       if(ch==';') break;
     }
     if(ch==EOF) break;
+    total_inst++;
     // printf("%s\n",cmd);
     YY_BUFFER_STATE bp = yy_scan_string(cmd);
       if (bp == nullptr) {
@@ -587,7 +590,7 @@ dberr_t ExecuteEngine::ExecuteExecfile(pSyntaxNode ast, ExecuteContext *context)
         printf("%s\n", MinisqlParserGetErrorMessage());
       } else {
         // Comment them out if you don't need to debug the syntax tree
-        printf("[INFO] Sql syntax parse ok!\n");
+        // printf("[INFO] Sql syntax parse ok!\n");
         // SyntaxTreePrinter printer(MinisqlGetParserRootNode());
         // printer.PrintTree(syntax_tree_file_mgr[syntax_tree_id++]);
       }
@@ -601,9 +604,15 @@ dberr_t ExecuteEngine::ExecuteExecfile(pSyntaxNode ast, ExecuteContext *context)
 
       // quit condition
       ExecuteInformation(result);
+      if(result==DB_SUCCESS||result==DB_QUIT) succ_inst++;
       if(result==DB_QUIT) return DB_QUIT;
   }
-  return DB_FAILED;
+  auto stop_time = std::chrono::system_clock::now();
+  double duration_time =
+      double((std::chrono::duration_cast<std::chrono::milliseconds>(stop_time - start_time)).count());
+  printf("File \"%s\": Total %d insts, Succeeded %d insts (%.4f sec)\n",
+  filename.c_str(),total_inst,succ_inst,duration_time/1000);
+  return DB_SUCCESS;
 }
 
 /**
