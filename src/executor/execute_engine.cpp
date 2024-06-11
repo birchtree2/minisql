@@ -490,9 +490,24 @@ dberr_t ExecuteEngine::ExecuteCreateIndex(pSyntaxNode ast, ExecuteContext *conte
   while(node!= nullptr){
     index_keys.push_back(string(node->val_));
     node=node->next_;
+    }
+  IndexInfo* index_info;
+  TableInfo* table_info;
+  auto ret=catalog->CreateIndex(table_name,index_name,index_keys,context->GetTransaction(),index_info,"btree");
+  if(ret!=DB_SUCCESS)return ret;
+  //遍历堆表
+  catalog->GetTable(table_name,table_info);//获取
+  auto heap=table_info->GetTableHeap();
+  Row row,key_row;
+  TableIterator it=heap->Begin(context->GetTransaction());
+  while(it!=heap->End()){
+    row=*it;
+    //提取出row里面作为key的部分
+    row.GetKeyFromRow(table_info->GetSchema(),index_info->GetIndexKeySchema(),key_row);
+    index_info->GetIndex()->InsertEntry(key_row,row.GetRowId(),context->GetTransaction());
+    it++;
   }
-  IndexInfo *index_info;
-  return catalog->CreateIndex(table_name,index_name,index_keys,context->GetTransaction(),index_info,"btree");
+  return DB_SUCCESS;
 }
 
 /**
