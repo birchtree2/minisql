@@ -410,7 +410,7 @@ dberr_t ExecuteEngine::ExecuteCreateTable(pSyntaxNode ast, ExecuteContext *conte
     string s="";
     for(auto t : primary_keys) s+=t+"_";
     catalog->CreateIndex(table_name, "PK_"+s + "_"+"ON_" + table_name, 
-        unique_keys, context->GetTransaction(), index_info, "btree");
+        primary_keys, context->GetTransaction(), index_info, "btree");//用primary key建index
   }
   return DB_SUCCESS;
 }
@@ -566,7 +566,8 @@ dberr_t ExecuteEngine::ExecuteExecfile(pSyntaxNode ast, ExecuteContext *context)
       if(ch!=EOF)cmd[ptr++]=ch;
       if(ch==';') break;
     }
-    printf("%s\n",cmd);
+    if(ch==EOF) break;
+    // printf("%s\n",cmd);
     YY_BUFFER_STATE bp = yy_scan_string(cmd);
       if (bp == nullptr) {
         LOG(ERROR) << "Failed to create yy buffer state." << std::endl;
