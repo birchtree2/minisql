@@ -120,6 +120,7 @@ void TableHeap::RollbackDelete(const RowId &rid, Txn *txn) {
  * TODO: Student Implement
  */
 bool TableHeap::GetTuple(Row *row, Txn *txn) { 
+  // LOG(INFO)<<"start gettuple";
   RowId rid = row->GetRowId();
   page_id_t current_page_id = rid.GetPageId();
   TablePage *page = reinterpret_cast<TablePage *>(buffer_pool_manager_->FetchPage(current_page_id));
@@ -131,6 +132,7 @@ bool TableHeap::GetTuple(Row *row, Txn *txn) {
   if(page->GetTuple(row, schema_, txn, lock_manager_)){
     buffer_pool_manager_->UnpinPage(page->GetTablePageId(), false); //
     page->RUnlatch();
+    // LOG(INFO)<<"end gettuple";
     return true;
   }
   buffer_pool_manager_->UnpinPage(page->GetTablePageId(), false); // 只读没改动
@@ -170,7 +172,7 @@ TableIterator TableHeap::Begin(Txn *txn) {
     buffer_pool_manager_->UnpinPage(begin_page_id, false);
     begin_page_id = begin_page->GetNextPageId();
   }
-  LOG(ERROR)<<"TableHeap::Begin: no tuple in table";
+  //LOG(ERROR)<<"TableHeap::Begin: no tuple in table";
   return TableIterator(this, RowId(), txn); 
 }
 

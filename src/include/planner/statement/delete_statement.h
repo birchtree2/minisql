@@ -27,7 +27,7 @@ class DeleteStatement : public AbstractStatement {
         break;
       }
       case kNodeConditions: {
-        where_ = MakePredicate(ast->child_, table_name_);
+        where_ = MakePredicate(ast->child_, table_name_,&column_in_condition_);
         break;
       }
       default:
@@ -41,7 +41,7 @@ class DeleteStatement : public AbstractStatement {
 
   /** Bound WHERE clause. */
   AbstractExpressionRef where_ = nullptr;
-
+  std::vector<uint32_t> column_in_condition_;//用于index
   std::string ToString() const override {
     std::stringstream sstream;
     sstream << "Delete {{\\n  table={" << table_name_ << "}\\n }}";

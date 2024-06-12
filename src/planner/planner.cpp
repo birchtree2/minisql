@@ -63,16 +63,56 @@ AbstractPlanNodeRef Planner::PlanInsert(std::shared_ptr<InsertStatement> stateme
 AbstractPlanNodeRef Planner::PlanDelete(std::shared_ptr<DeleteStatement> statement) {
   TableInfo *info = nullptr;
   context_->GetCatalog()->GetTable(statement->table_name_, info);
-  auto scan_plan = make_shared<SeqScanPlanNode>(info->GetSchema(), statement->table_name_, statement->where_);
-  return std::make_shared<DeletePlanNode>(info->GetSchema(), scan_plan, statement->table_name_);
+  vector<IndexInfo *> indexes;
+  vector<IndexInfo *> available_index;
+  context_->GetCatalog()->GetTableIndexes(statement->table_name_, indexes);
+  for (auto index : indexes) {
+    if (index->GetIndexKeySchema()->GetColumns().size() == 1) {
+      auto col_id = index->GetIndexKeySchema()->GetColumn(0)->GetTableInd();
+      if (std::find(statement->column_in_condition_.begin(), statement->column_in_condition_.end(), col_id) !=
+          statement->column_in_condition_.end()) {
+        available_index.push_back(index);
+      }
+    }
+  }
+  if(available_index.empty()){
+    auto scan_plan = make_shared<SeqScanPlanNode>(info->GetSchema(), statement->table_name_, statement->where_);
+    return std::make_shared<DeletePlanNode>(info->GetSchema(), scan_plan, statement->table_name_);
+  }else{
+    auto scan_plan=make_shared<IndexScanPlanNode>(info->GetSchema(), statement->table_name_, available_index,
+                                        available_index.size() != statement->column_in_condition_.size(),
+                                        statement->where_);
+    return std::make_shared<DeletePlanNode>(info->GetSchema(), scan_plan, statement->table_name_);
+  }
 }
 
 AbstractPlanNodeRef Planner::PlanUpdate(std::shared_ptr<UpdateStatement> statement) {
   TableInfo *info = nullptr;
   context_->GetCatalog()->GetTable(statement->table_name_, info);
-  auto scan_plan = make_shared<SeqScanPlanNode>(info->GetSchema(), statement->table_name_, statement->where_);
-  return std::make_shared<UpdatePlanNode>(info->GetSchema(), scan_plan, statement->table_name_,
+    vector<IndexInfo *> indexes;
+  vector<IndexInfo *> available_index;
+  context_->GetCatalog()->GetTableIndexes(statement->table_name_, indexes);
+  for (auto index : indexes) {
+    if (index->GetIndexKeySchema()->GetColumns().size() == 1) {
+      auto col_id = index->GetIndexKeySchema()->GetColumn(0)->GetTableInd();
+      if (std::find(statement->column_in_condition_.begin(), statement->column_in_condition_.end(), col_id) !=
+          statement->column_in_condition_.end()) {
+        available_index.push_back(index);
+      }
+    }
+  }
+  if(available_index.empty()){
+    auto scan_plan = make_shared<SeqScanPlanNode>(info->GetSchema(), statement->table_name_, statement->where_);
+    return std::make_shared<UpdatePlanNode>(info->GetSchema(), scan_plan, statement->table_name_,
                                           statement->update_attrs);
+  }else{
+    auto scan_plan=make_shared<IndexScanPlanNode>(info->GetSchema(), statement->table_name_, available_index,
+                                        available_index.size() != statement->column_in_condition_.size(),
+                                        statement->where_);
+    return std::make_shared<UpdatePlanNode>(info->GetSchema(), scan_plan, statement->table_name_,
+                                          statement->update_attrs);                                    
+  }
+  
 }
 
 Schema *Planner::MakeOutputSchema(const vector<std::pair<std::string, AbstractExpressionRef>> &exprs) {

@@ -37,7 +37,7 @@ class UpdateStatement : public AbstractStatement {
         break;
       }
       case kNodeConditions: {
-        where_ = MakePredicate(ast->child_, table_name_);
+        where_ = MakePredicate(ast->child_, table_name_,&column_in_condition_);
         break;
       }
       default:
@@ -62,7 +62,7 @@ class UpdateStatement : public AbstractStatement {
   }
 
   std::string table_name_;
-
+  std::vector<uint32_t> column_in_condition_;//用于index
   AbstractExpressionRef where_;
 
   std::unordered_map<uint32_t, AbstractExpressionRef> update_attrs;
