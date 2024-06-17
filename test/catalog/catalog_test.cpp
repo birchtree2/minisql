@@ -127,3 +127,54 @@ TEST(CatalogTest, CatalogIndexTest) {
   }
   delete db_02;
 }
+
+TEST(CatalogTest, CatalogTableTestMore)
+{
+    auto db_01 = new DBStorageEngine(db_file_name, true);
+    auto &catalog_01 = db_01->catalog_mgr_;
+    TableInfo *table_info1 = nullptr;
+    ASSERT_EQ(DB_TABLE_NOT_EXIST, catalog_01->GetTable("table-1", table_info1));
+    std::vector<Column *> columns = {new Column("id", TypeId::kTypeInt, 0, false, false),
+                                     new Column("name", TypeId::kTypeChar, 64, 1, true, false),
+                                     new Column("account", TypeId::kTypeFloat, 2, true, false)};
+    auto schema = std::make_shared<Schema>(columns);
+    Txn txn;
+
+    catalog_01->CreateTable("table-1", schema.get(), &txn, table_info1);
+
+    ASSERT_EQ(DB_TABLE_ALREADY_EXIST, catalog_01->CreateTable("table-1", schema.get(), &txn, table_info1));
+
+    TableInfo *table_info1_cpy = nullptr;
+    ASSERT_EQ(DB_SUCCESS, catalog_01->GetTable("table-1", table_info1_cpy));
+    ASSERT_EQ(table_info1_cpy, table_info1);
+
+    ASSERT_EQ(table_info1->GetTableName(), "table-1");
+
+    TableHeap *table_heap1 = table_info1->GetTableHeap();
+
+    std::vector<Row> table_rows1;
+    int32_t len = RandomUtils::RandomInt(0, 64);
+    char *characters = new char[len];
+    RandomUtils::RandomString(characters, len);
+      ::vector<Field> *fields = new std::vector<Field>{
+        Field(TypeId::kTypeInt, 0), Field(TypeId::kTypeChar, const_cast<char *>(characters), len, true),
+        Field(TypeId::kTypeFloat, RandomUtils::RandomFloat(-999.f, 999.f))};
+    Row row(*fields);
+    ASSERT_TRUE(table_heap1->InsertTuple(row, nullptr));
+    delete[] characters;
+
+    for (auto it = table_heap1->Begin(&txn); it != table_heap1->End(); ++it)
+    {
+        const Row &r = (*it);
+        table_rows1.push_back(r);
+    }
+
+    ASSERT_EQ(DB_SUCCESS, catalog_01->DropTable("table-1"));
+
+    table_info1 = table_info1_cpy = nullptr;
+
+    ASSERT_EQ(DB_TABLE_NOT_EXIST, catalog_01->GetTable("table-1", table_info1));
+
+    delete db_01;
+
+}

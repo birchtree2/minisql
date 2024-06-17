@@ -49,7 +49,7 @@ uint32_t IndexMetadata::GetSerializedSize() const {
 
 uint32_t IndexMetadata::DeserializeFrom(char *buf, IndexMetadata *&index_meta) {
   if (index_meta != nullptr) {
-    LOG(WARNING) << "Pointer object index info is not null in table info deserialize." << std::endl;
+    // LOG(WARNING) << "Pointer object index info is not null in table info deserialize." << std::endl;
   }
   char *p = buf;
   // magic num

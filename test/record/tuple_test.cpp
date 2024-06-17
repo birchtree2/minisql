@@ -101,3 +101,53 @@ TEST(TupleTest, RowTest) {
   ASSERT_TRUE(table_page.MarkDelete(row.GetRowId(), nullptr, nullptr, nullptr));
   table_page.ApplyDelete(row.GetRowId(), nullptr, nullptr);
 }
+TEST(TupleTest, ColumnTest)
+{
+    std::vector<Column *> columns = {new Column("id", TypeId::kTypeInt, 0, false, false),
+                                     new Column("name", TypeId::kTypeChar, 64, 1, true, false),
+                                     new Column("account", TypeId::kTypeFloat, 2, true, false)};
+
+    // Serialize to buffer
+    char buf[1000];
+    memset(buf, 0, sizeof(buf));
+    uint32_t serialize_offset = columns[0]->SerializeTo(buf);
+    uint32_t serialize_size = columns[0]->GetSerializedSize();
+    EXPECT_EQ(serialize_offset, serialize_size);
+    Column *ptr = NULL;
+
+    // Deserialize from buffer
+    Column::DeserializeFrom(buf, ptr);
+    EXPECT_EQ(ptr->GetLength(), columns[0]->GetLength());
+    EXPECT_EQ(ptr->GetName(), columns[0]->GetName());
+    EXPECT_EQ(ptr->GetTableInd(), columns[0]->GetTableInd());
+    EXPECT_EQ(ptr->GetType(), columns[0]->GetType());
+}
+TEST(TupleTest, SchemaTest)
+{
+    std::vector<Column *> columns = {new Column("id", TypeId::kTypeInt, 0, false, false),
+                                     new Column("name", TypeId::kTypeChar, 64, 1, true, false),
+                                     new Column("account", TypeId::kTypeFloat, 2, true, false)};
+
+    // Serialize to buffer
+    Schema *schema = new Schema(columns);
+    char buf[1000];
+    memset(buf, 0, sizeof(buf));
+    uint32_t serialize_offset = schema->SerializeTo(buf);
+    uint32_t serialize_size = schema->GetSerializedSize();
+    EXPECT_EQ(serialize_offset, serialize_size);
+    Schema *sptr = NULL;
+
+    // Deserialize from buffer
+    Schema::DeserializeFrom(buf, sptr);
+
+    EXPECT_EQ(sptr->GetColumnCount(), schema->GetColumnCount());
+    std::vector<Column *> ptr_columns = sptr->GetColumns();
+    for (int i = 0; i < ptr_columns.size(); ++i)
+    {
+        auto ptr = ptr_columns[i];
+        EXPECT_EQ(ptr->GetLength(), columns[i]->GetLength());
+        EXPECT_EQ(ptr->GetName(), columns[i]->GetName());
+        EXPECT_EQ(ptr->GetTableInd(), columns[i]->GetTableInd());
+        EXPECT_EQ(ptr->GetType(), columns[i]->GetType());
+    }
+}
