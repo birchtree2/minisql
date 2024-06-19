@@ -30,6 +30,53 @@ TEST_F(ExecutorTest, SimpleSeqScanTest) {
     ASSERT_TRUE(row.GetField(0)->CompareLessThan(Field(kTypeInt, 500)));
   }
 }
+//自定义测试
+TEST_F(ExecutorTest, ComplexSeqScanTest) {
+  // Construct query plan
+  TableInfo *table_info;
+  GetExecutorContext()->GetCatalog()->GetTable("table-1", table_info);
+  const Schema *schema = table_info->GetSchema();
+  auto col_a = MakeColumnValueExpression(*schema, 0, "id");
+  auto col_b = MakeColumnValueExpression(*schema, 0, "name");
+  auto const500 = MakeConstantValueExpression(Field(kTypeInt, 500));
+  auto constm1= MakeConstantValueExpression(Field(kTypeInt, -1));
+  // Test "<"
+  auto predicate1 = MakeComparisonExpression(col_a, const500, "<");
+  // Test "="
+  auto predicate2 = MakeComparisonExpression(col_a, constm1, "=");
+  // Test "!="
+  auto predicate3 = MakeComparisonExpression(col_a, const500, "<>");
+  
+  // Define the output schema
+  auto out_schema = MakeOutputSchema({{"id", col_a}, {"name", col_b}});
+  
+  // Execute the plans
+  std::vector<Row> result_set1{};
+  std::vector<Row> result_set2{};
+  std::vector<Row> result_set3{};
+  
+  auto plan1 = make_shared<SeqScanPlanNode>(out_schema, table_info->GetTableName(), predicate1);
+  auto plan2 = make_shared<SeqScanPlanNode>(out_schema, table_info->GetTableName(), predicate2);
+  auto plan3 = make_shared<SeqScanPlanNode>(out_schema, table_info->GetTableName(), predicate3);
+  
+  GetExecutionEngine()->ExecutePlan(plan1, &result_set1, GetTxn(), GetExecutorContext());
+  GetExecutionEngine()->ExecutePlan(plan2, &result_set2, GetTxn(), GetExecutorContext());
+  GetExecutionEngine()->ExecutePlan(plan3, &result_set3, GetTxn(), GetExecutorContext());
+
+  // Verify
+  ASSERT_EQ(result_set1.size(), 500);
+  for (const auto &row : result_set1) {
+    ASSERT_TRUE(row.GetField(0)->CompareLessThan(Field(kTypeInt, 500)));
+  }
+  
+  // Check if result_set2 is empty, assuming no id equals to -1s
+  ASSERT_TRUE(result_set2.empty());
+  
+  // Check if ids in result_set3 are not equal to 500
+  for (const auto &row : result_set3) {
+    ASSERT_FALSE(row.GetField(0)->CompareEquals(Field(kTypeInt, 500)));
+  }
+}
 
 // DELETE FROM table-1 WHERE id == 50;
 TEST_F(ExecutorTest, SimpleDeleteTest) {

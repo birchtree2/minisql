@@ -47,14 +47,28 @@ TEST(DiskManagerTest, FreePageAllocationTest) {
     EXPECT_EQ(i % DiskManager::BITMAP_SIZE + 1, meta_page->GetExtentUsedPage(i / DiskManager::BITMAP_SIZE));
     // if(i==100) break;//for debug
   }
+  
   disk_mgr->DeAllocatePage(0);
   disk_mgr->DeAllocatePage(DiskManager::BITMAP_SIZE - 1);
   disk_mgr->DeAllocatePage(DiskManager::BITMAP_SIZE);
   disk_mgr->DeAllocatePage(DiskManager::BITMAP_SIZE + 1);
   disk_mgr->DeAllocatePage(DiskManager::BITMAP_SIZE + 2);
+
+  //1. 测试非连续页面的释放
+  disk_mgr->DeAllocatePage(3);
+  disk_mgr->DeAllocatePage(DiskManager::BITMAP_SIZE + 3);
+  //2. 测试已被释放页面的二次释放
+  disk_mgr->DeAllocatePage(0);
+  disk_mgr->DeAllocatePage(DiskManager::BITMAP_SIZE);
+  //3. 测试超出分配范围的页面的释放
+  disk_mgr->DeAllocatePage(DiskManager::BITMAP_SIZE * extent_nums);
+  disk_mgr->DeAllocatePage(DiskManager::BITMAP_SIZE * extent_nums + 1);
+
   DiskFileMetaPage *meta_page = reinterpret_cast<DiskFileMetaPage *>(disk_mgr->GetMetaData());
-  EXPECT_EQ(extent_nums * DiskManager::BITMAP_SIZE - 5, meta_page->GetAllocatedPages());
-  EXPECT_EQ(DiskManager::BITMAP_SIZE - 2, meta_page->GetExtentUsedPage(0));
-  EXPECT_EQ(DiskManager::BITMAP_SIZE - 3, meta_page->GetExtentUsedPage(1));
+
+  EXPECT_EQ(extent_nums * DiskManager::BITMAP_SIZE - 7, meta_page->GetAllocatedPages());
+  EXPECT_EQ(DiskManager::BITMAP_SIZE - 3, meta_page->GetExtentUsedPage(0));
+  EXPECT_EQ(DiskManager::BITMAP_SIZE - 4, meta_page->GetExtentUsedPage(1));
+  
   remove(db_name.c_str());
 }
