@@ -113,7 +113,7 @@ void DiskManager::DeAllocatePage(page_id_t logical_page_id) {
     pMetaPage->num_allocated_pages_--;
     pMetaPage->extent_used_page_[ext_id]--;
   }else{
-    LOG(ERROR)<<"bmap allocate failed";
+    // LOG(ERROR)<<"bmap allocate failed";
   }
 }
 
